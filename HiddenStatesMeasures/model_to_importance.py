@@ -126,38 +126,23 @@ def cosine_similarity_vectors(vecs1, vecs2):
     cos_sim = np.sum(vecs1_norm * vecs2_norm, axis=1)
     return np.mean(cos_sim)
 
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model_path", type=str, required=True)
-    parser.add_argument("--dataset_name", type=str, required=True)
-    parser.add_argument("--layer_type", type=str, default="mlp",
-                        choices=['input_layernorm', 'self_attn', 'post_attention_layernorm', 'mlp'],
-                        help="Which internal layer's hidden states to analyze")
-    parser.add_argument("--max_samples", type=int, default=None)
-    parser.add_argument("--metric", type=str, default="cosine",
-                    choices=['cosine', 'abs', 'std'],
-                    help="Importance metric: 'cosine' (1-cos), 'abs' (mean abs diff), 'std' (mean of std per vector)")
-    parser.add_argument("--max_tokens", type=int, default=150)
-    args = parser.parse_args()
-
-    # Load model and tokenizer
+def get_importances(model_path, dataset_name, max_tokens,  max_samples=0, layer_type='mlp', metric='cos', write_json=True):
     model = AutoModelForCausalLM.from_pretrained(
-        args.model_path,
+        model_path,
         device_map="auto",
         # torch_dtype=torch.float16
     )
-    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
 
     # Load dataset
-    dataset = load_dataset(args.dataset_name)
+    dataset = load_dataset(dataset_name)
     questions = dataset['test']['Question']
-    if args.max_samples:
-        questions = questions[:args.max_samples]
+    if max_samples:
+        questions = questions[:max_samples]
 
     # Step 1: Generate responses
     print("Generating responses...")
-    results = write_tokens_to_file(model, questions, tokenizer, generate_tokens=args.max_tokens)
+    results = write_tokens_to_file(model, questions, tokenizer, generate_tokens=max_tokens)
 
     # Step 2: Set up hooks to collect activations
     n_layers = len(model.model.layers)
@@ -187,7 +172,7 @@ def main():
 
     # Step 4: Compute importances directly in memory
     print("Computing importance scores...")
-    importances = compute_importances_from_activations(activations, layer_type=args.layer_type, metric=args.metric)
+    importances = compute_importances_from_activations(activations, layer_type=layer_type, metric=metric)
 
     # Output
     print("\nLayer Importances (sorted by change):")
@@ -195,9 +180,29 @@ def main():
         print(f"{layer_name}: {score:.4f}")
 
     # Optional: return or save final result
-    result_dict = {name: score for name, score in importances}
-    with open(f"importances_{args.layer_type}.json", "w") as f:
-        json.dump(result_dict, f, indent=2, cls=NumpyEncoder)
+    if write_json:
+        result_dict = {name: score for name, score in importances}
+        with open(f"importances_{model_path[-10:]}_{layer_type}.json", "w") as f:
+            json.dump(result_dict, f, indent=2, cls=NumpyEncoder)
+    return importances
+    
+    
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model_path", type=str, required=True)
+    parser.add_argument("--dataset_name", type=str, required=True)
+    parser.add_argument("--layer_type", type=str, default="mlp",
+                        choices=['input_layernorm', 'self_attn', 'post_attention_layernorm', 'mlp'],
+                        help="Which internal layer's hidden states to analyze")
+    parser.add_argument("--max_samples", type=int, default=None)
+    parser.add_argument("--metric", type=str, default="cosine",
+                    choices=['cosine', 'abs', 'std'],
+                    help="Importance metric: 'cosine' (1-cos), 'abs' (mean abs diff), 'std' (mean of std per vector)")
+    parser.add_argument("--max_tokens", type=int, default=150)
+    args = parser.parse_args()
+
+    get_importances(args.model_path, args.dataset_name, args.max_tokens, args.max_samples, args.layer_type, args.metric, write_json=True)
 
     print(f"Saved to importances_{args.layer_type}_{args.metric}.json")
 
