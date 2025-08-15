@@ -126,7 +126,7 @@ def cosine_similarity_vectors(vecs1, vecs2):
     cos_sim = np.sum(vecs1_norm * vecs2_norm, axis=1)
     return np.mean(cos_sim)
 
-def get_importances(model_path, dataset_name, max_tokens,  max_samples=0, layer_type='mlp', metric='cos', write_json=True):
+def get_importances(model_path, dataset_name, max_tokens, max_samples=0, layer_type='mlp', metric='cos', write_json=True):
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
         device_map="auto",
@@ -184,7 +184,7 @@ def get_importances(model_path, dataset_name, max_tokens,  max_samples=0, layer_
         result_dict = {name: score for name, score in importances}
         with open(f"importances_{model_path[-10:]}_{layer_type}.json", "w") as f:
             json.dump(result_dict, f, indent=2, cls=NumpyEncoder)
-    return importances
+    return [(int(i[i.find('_')+1:]), j) for i, j in importances]
     
     
 
@@ -202,10 +202,11 @@ def main():
     parser.add_argument("--max_tokens", type=int, default=150)
     args = parser.parse_args()
 
-    get_importances(args.model_path, args.dataset_name, args.max_tokens, args.max_samples, args.layer_type, args.metric, write_json=True)
+    imps = get_importances(args.model_path, args.dataset_name, args.max_tokens, args.max_samples, args.layer_type, args.metric, write_json=True)
 
     print(f"Saved to importances_{args.layer_type}_{args.metric}.json")
+    return imps
 
 
 if __name__ == "__main__":
-    main()
+    imps = main()
