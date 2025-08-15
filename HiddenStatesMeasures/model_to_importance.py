@@ -184,7 +184,7 @@ def get_importances(model_path, dataset_name, max_tokens, max_samples=0, layer_t
         result_dict = {name: score for name, score in importances}
         with open(f"importances_{model_path[-10:]}_{layer_type}.json", "w") as f:
             json.dump(result_dict, f, indent=2, cls=NumpyEncoder)
-    return [(int(i[i.find('_')+1:]), j) for i, j in importances]
+    return [(int(i[i.find('_')+1:]), j) for i, j in importances][::-1]
     
     
 
