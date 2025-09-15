@@ -65,10 +65,10 @@ def compute_importances_from_activations(activations, layer_type='mlp', metric='
 
     diffs = {layer: [] for layer in range(n_layers - 1)}
 
-    for n in range(n_layers - 1):
+    for n in range(1, n_layers - 1):
         for q in range(n_questions):
             try:
-                prev = np.array(layers_data[n][q])     # shape: [seq_len, d_model]
+                prev = np.array(layers_data[n - 1][q])     # shape: [seq_len, d_model]
                 cur = np.array(layers_data[n + 1][q])
 
                 # Truncate to same length
@@ -113,16 +113,13 @@ def cosine_similarity_vectors(vecs1, vecs2):
     norm1 = np.linalg.norm(vecs1, axis=1)
     norm2 = np.linalg.norm(vecs2, axis=1)
 
-    # Avoid division by zero
     eps = 1e-8
     norm1[norm1 == 0] = eps
     norm2[norm2 == 0] = eps
 
-    # Normalize
     vecs1_norm = vecs1 / norm1[:, None]
     vecs2_norm = vecs2 / norm2[:, None]
 
-    # Dot product
     cos_sim = np.sum(vecs1_norm * vecs2_norm, axis=1)
     return np.mean(cos_sim)
 
